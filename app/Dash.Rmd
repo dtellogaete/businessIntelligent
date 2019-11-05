@@ -1,0 +1,265 @@
+---
+title: "Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+runtime: shiny
+
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(RPostgreSQL)
+library(DBI)
+con <- dbConnect(RPostgres::Postgres(),dbname = 'defaultdb', 
+                 host = 'db-postgresql-nyc1-07205-do-user-6717830-0.db.ondigitalocean.com',
+                 port = 25060, # or any other port specified by your DBA
+                 user = 'doadmin',
+                 password = 'eert79mvt8u4a2uz')
+month_ = as.integer(format(Sys.time(), "%m"))
+year_ = as.integer(format(Sys.time(), "%Y"))
+```
+
+```{r}
+#Ventas
+query1 = "SELECT SUM(VALUE),
+EXTRACT(Month FROM documents.date) AS month_,
+EXTRACT(Year from documents.date) AS year_
+from documents
+where id_type_document = 2
+group by
+month_, year_
+order by
+year_, month_"
+
+queryVentas = paste(query1)
+
+res <- dbSendQuery(con, queryVentas)
+salesMonth = dbFetch(res)
+dbClearResult(res)
+
+
+#Compras
+
+query1 = "SELECT SUM(VALUE),
+EXTRACT(Month FROM documents.date) AS month_,
+EXTRACT(Year from documents.date) AS year_
+from documents
+where id_type_document = 1
+group by
+month_, year_
+order by
+year_, month_"
+
+res <- dbSendQuery(con, query1)
+purchasesMonth = dbFetch(res)
+dbClearResult(res)
+
+
+# Margen 
+
+query1 = "select sum(value),
+EXTRACT(Month FROM documents.date) AS month_,
+EXTRACT(Year from documents.date) AS year_
+from documents
+group by
+month_, year_
+order by
+year_, month_"
+
+res <- dbSendQuery(con, query1)
+margenMonth = dbFetch(res)
+dbClearResult(res)
+
+#Total RUT
+
+query1 = "select*from sales_rut"
+res <- dbSendQuery(con, query1)
+totalRUT = dbFetch(res)
+dbClearResult(res)
+
+#Rut Sales
+query1 = "select*from sales_rut
+where sum>0"
+res <- dbSendQuery(con, query1)
+totalSalesRUT = dbFetch(res)
+dbClearResult(res)
+
+#Rut Purchase
+query1 = "select*from sales_rut
+where sum<0"
+res <- dbSendQuery(con, query1)
+totalPurchaseRUT = dbFetch(res)
+dbClearResult(res)
+
+#RUT
+
+query1 = "select rut from company"
+res <- dbSendQuery(con, query1)
+rut = dbFetch(res)
+dbClearResult(res)
+
+
+```
+
+
+
+Inputs {.sidebar}
+-------------------------------------
+```{r}
+library("shiny")
+
+selectInput("rut", label = h3("Rut Empresa"), 
+    choices = rut, 
+    selected = 1)
+
+```
+ 
+Column
+-------------------------------------
+    
+### Ventas
+```{r}
+library(plotly)
+zeroV = c(1:26)*0
+num <- reactive(as.character(input$rut))
+
+ventas= salesMonth$sum/1000000
+mesesV = paste(salesMonth$month_, "01",salesMonth$year_, sep="/")
+mesesV = as.Date(mesesV, "%m/%d/%Y")
+
+ventasMes = data.frame(ventas, mesesV)
+
+
+renderPlotly({
+  
+  if(any( totalSalesRUT['rut'] == input$rut)==TRUE){
+  subdataV = subset(totalSalesRUT, rut == input$rut)
+  submesesV =paste(subdataV$month_, "01",subdataV$year_, sep="/")
+  submesesV = as.Date(submesesV, "%m/%d/%Y")
+  
+  for (i in 1:length(submesesV)){
+  for(j in 1:length(mesesV)){
+    if(mesesV[j]==submesesV[i]){
+      zeroV[j] = subdataV$sum[i]/1000000
+    }
+  }
+  }
+  }
+  p = plot_ly(ventasMes, x = ~mesesV,
+            y = ~ventas,
+            name = 'Ventas',  type = 'scatter', mode = 'lines',
+            line = list(color = 'forestgreen', width = 4)) %>%
+            config(displayModeBar = FALSE) %>% 
+     add_trace(y = ~zeroV, name = input$rut, line = list(color = 'gray48', width = 2)) %>%
+  layout(title = "",
+         xaxis = list(title = "Meses"),
+         yaxis = list (title = "MM$"))
+
+})
+
+
+
+
+```
+    
+### Compras
+
+```{r}
+library(plotly)
+zeroC = c(1:12)*0
+num <- reactive(as.character(input$rut))
+
+compras= -1*purchasesMonth$sum/1000000
+mesesC = paste(purchasesMonth$month_, "01",purchasesMonth$year_, sep="/")
+mesesC = as.Date(mesesC, "%m/%d/%Y")
+
+comprasMes = data.frame(compras, mesesC)
+
+
+renderPlotly({
+  if(any( totalPurchaseRUT['rut'] == input$rut)==TRUE){
+  subdataC = subset(totalPurchaseRUT, rut == input$rut)
+  submesesC =paste(subdataC$month_, "01",subdataC$year_, sep="/")
+  submesesC = as.Date(submesesC, "%m/%d/%Y")
+  
+  
+  
+  for (i in 1:length(submesesC)){
+  for(j in 1:length(mesesC)){
+    
+    if(mesesC[j]==submesesC[i]){
+      zeroC[j] = subdataC$sum[i]/1000000
+    
+    }
+  }
+  }
+  }
+  p = plot_ly(comprasMes, x = ~mesesC,
+            y = ~1*compras,
+            name = 'Compras',  type = 'scatter', mode = 'lines',
+            line = list(color = 'firebrick', width = 4)) %>%
+            config(displayModeBar = FALSE) %>% 
+     
+     add_trace(y = ~(zeroC*-1), name = input$rut, line = list(color = 'gray48
+', width = 2)) %>%
+  layout(title = "",
+         xaxis = list(title = "Meses"),
+         yaxis = list (title = "MM$"))
+
+})
+
+
+
+```
+
+### Margen Bruto
+
+```{r}
+zero = c(1:26)*0
+marge = margenMonth$sum/1000000
+mesesM = paste(margenMonth$month_, "01",margenMonth$year_, sep="/")
+mesesM = as.Date(mesesM, "%m/%d/%Y")
+
+margen = data.frame(marge, mesesM)
+
+
+
+renderPlotly({
+  subdata = subset(totalRUT, rut == input$rut)
+  submeses =paste(subdata$month_, "01",subdata$year_, sep="/")
+  submeses = as.Date(submeses, "%m/%d/%Y")
+  
+  for (i in 1:length(submeses)){
+  for(j in 1:length(mesesV)){
+    
+    if(mesesV[j]==submeses[i]){
+      zero[j] = subdata$sum[i]/1000000
+      print(i)
+    }
+  }
+}
+  
+   p = plot_ly(margen, x = ~c(mesesM),
+            y = ~marge,
+            name = 'Margen',  type = 'scatter', mode = 'lines',
+            line = list(color = 'cornflowerblue', width = 4)) %>%
+            config(displayModeBar = FALSE) %>%
+     
+     add_trace(y = ~zero, name = input$rut, line = list(color = 'gray48
+', width = 2)) %>%
+  layout(title = "",
+         xaxis = list(title = "Meses"),
+         yaxis = list (title = "MM$"))
+
+})
+
+
+
+
+
+
+
+
+```
