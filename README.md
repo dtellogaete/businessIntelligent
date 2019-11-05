@@ -15,6 +15,8 @@ En las hojas Dummy-Data y Compra, existen datos que es necesario transformar, es
 
 ## Visualización de datos
 
+Para la visualización de los datos se utilizan dos herramientas Power BI y [Fleshdashboard](https://rmarkdown.rstudio.com/flexdashboard/) 
+
 ### Power BI
 
 ![Power BI](https://github.com/dtellogaete/businessIntelligent/blob/master/imagenes/2.PNG)
