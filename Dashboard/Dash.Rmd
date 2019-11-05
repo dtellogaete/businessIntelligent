@@ -16,7 +16,7 @@ con <- dbConnect(RPostgres::Postgres(),dbname = 'defaultdb',
                  host = 'db-postgresql-nyc1-07205-do-user-6717830-0.db.ondigitalocean.com',
                  port = 25060, # or any other port specified by your DBA
                  user = 'doadmin',
-                 password = 'eert79mvt8u4a2uz')
+                 password = '')
 month_ = as.integer(format(Sys.time(), "%m"))
 year_ = as.integer(format(Sys.time(), "%Y"))
 ```
